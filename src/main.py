@@ -1,9 +1,10 @@
 import cv2
-from embedding_utils import generate_embedding
+from deepface import DeepFace
 
 camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 while True:
+
     success, frame = camera.read()
 
     if not success:
@@ -13,21 +14,20 @@ while True:
 
     key = cv2.waitKey(1)
 
-    if key == ord("e"):
+    if key == ord("v"):
 
-        print("Generating embedding...")
+        print("Verifying...")
 
-        embedding = generate_embedding(frame)
+        result = DeepFace.verify(
+            img1_path=frame,
+            img2_path="known_faces/Gautam.jpg",
+            detector_backend="opencv"
+        )
 
-        print("Embedding Length:", len(embedding))
-        print("First 5 Values:", embedding[:5])
+        print(result)
 
     if key == ord("q"):
         break
 
 camera.release()
 cv2.destroyAllWindows()
-
-
-
-
