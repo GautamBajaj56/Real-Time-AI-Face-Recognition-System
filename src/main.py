@@ -4,7 +4,6 @@ from embedding_utils import generate_embedding
 camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 while True:
-
     success, frame = camera.read()
 
     if not success:
@@ -28,3 +27,7 @@ while True:
 
 camera.release()
 cv2.destroyAllWindows()
+
+
+
+
