@@ -20,3 +20,7 @@ Thumbs.db
 
 # Embeddings (optional)
 embeddings/*.pkl
+
+reference_images/*.jpg
+known_faces/*.jpg
+test_images/*.jpg

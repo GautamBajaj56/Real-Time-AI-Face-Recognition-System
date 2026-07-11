@@ -10,7 +10,7 @@ app = FaceAnalysis(
 app.prepare(ctx_id=0, det_size=(640, 640))
 
 # Read reference image
-image = cv2.imread("reference_images/Gautam.jpg")
+image = cv2.imread("reference_images/hemank.png")
 
 faces = app.get(image)
 
@@ -27,7 +27,7 @@ x1, y1, x2, y2 = face.bbox.astype(int)
 face_crop = image[y1:y2, x1:x2]
 
 # Save cropped face
-cv2.imwrite("known_faces/Gautam_face.jpg", face_crop)
+cv2.imwrite("known_faces/hemank_face.jpg", face_crop)
 
 print("Enrollment Successful!")
 

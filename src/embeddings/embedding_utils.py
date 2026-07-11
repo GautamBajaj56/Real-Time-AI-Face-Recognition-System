@@ -1,4 +1,4 @@
-from unittest import result
+
 
 from deepface import DeepFace
 
@@ -14,8 +14,7 @@ def generate_embedding(image):
 
 
 
-    print(len(result))
-    print(result[0].keys())
+    
     return result[0]["embedding"]
 
     
