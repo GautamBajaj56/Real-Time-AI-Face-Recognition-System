@@ -3,7 +3,7 @@ import time
 import psutil
 import threading
 from insightface.app import FaceAnalysis
-from rich.prompt import result
+
 from recognition.recognizer import recognize_face
 
 # ----------------------------------------
