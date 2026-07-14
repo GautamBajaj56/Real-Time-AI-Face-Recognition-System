@@ -1,26 +1,45 @@
+# -----------------------------------
 # Virtual Environment
+# -----------------------------------
 .venv/
 
-# Python cache
+# -----------------------------------
+# Python Cache
+# -----------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
 
+# -----------------------------------
 # VS Code
+# -----------------------------------
 .vscode/
 
-# OS files
+# -----------------------------------
+# OS Files
+# -----------------------------------
 .DS_Store
 Thumbs.db
 
-# Model weights
+# -----------------------------------
+# Model Files
+# -----------------------------------
 *.h5
+*.pt
 
-# DeepFace cache
+# -----------------------------------
+# DeepFace Cache
+# -----------------------------------
 .deepface/
 
-# Embeddings (optional)
-embeddings/*.pkl
+# -----------------------------------
+# Runtime Data
+# -----------------------------------
+embeddings/
 
-reference_images/*.jpg
-known_faces/*.jpg
-test_images/*.jpg
+# -----------------------------------
+# Local Images / Datasets
+# -----------------------------------
+raw_faces/
+known_faces/
+reference_images/
+test_images/
