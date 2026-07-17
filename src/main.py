@@ -3,6 +3,7 @@ import time
 import psutil
 import threading
 from insightface.app import FaceAnalysis
+from antispoof.model import AntiSpoofModel
 
 from recognition.recognizer import recognize_face
 
@@ -12,6 +13,9 @@ from recognition.recognizer import recognize_face
 app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
 
 app.prepare(ctx_id=0, det_size=(640, 640))
+antispoof = AntiSpoofModel(
+    "models/antispoof/best_model_quantized.onnx"
+)
 # ----------------------------------------
 # Open Webcam
 # ----------------------------------------
@@ -59,6 +63,12 @@ cpu_samples = 0
 
 total_ram_usage = 0
 ram_samples = 0
+
+# ----------------------------------------
+# AntiSpoof Cache
+# ----------------------------------------
+last_is_live = False
+last_liveness_confidence = 0.0
 
 # ----------------------------------------
 # Background Verification Function
@@ -123,15 +133,21 @@ while True:
     # ----------------------------------------
     frame_count += 1
 
-    if frame_count % 8 == 0:
-        last_faces = app.get(frame)
-
     # ----------------------------------------
     # Detect Face & Crop
     # ----------------------------------------
     face_crop = None
+    is_live = False
+    liveness_confidence = 0.0
     largest_face = None
     largest_area = -1
+
+    if frame_count % 8 == 0:
+        last_faces = app.get(frame)
+
+        if len(last_faces) == 0:
+            last_is_live = False
+            last_liveness_confidence = 0.0
 
     for face in last_faces:
 
@@ -148,7 +164,9 @@ while True:
             largest_face = face
 
     if largest_face is not None:
-        x1, y1, x2, y2 = largest_face.bbox.astype(int)
+        raw_x1, raw_y1, raw_x2, raw_y2 = largest_face.bbox.astype(int)
+
+        x1, y1, x2, y2 = raw_x1, raw_y1, raw_x2, raw_y2
         x1 = max(0, x1)
         y1 = max(0, y1)
         x2 = min(frame.shape[1], x2)
@@ -158,19 +176,41 @@ while True:
 
         face_crop = frame[y1:y2, x1:x2]
 
+        if face_crop.size != 0 and frame_count % 8 == 0:
+            try:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                liveness_crop = antispoof.crop_face(
+                    frame_rgb,
+                    (raw_x1, raw_y1, raw_x2, raw_y2),
+                )
+                is_live, liveness_confidence = antispoof.check(liveness_crop)
+                print(
+                    f"[AntiSpoof] Live={is_live}, Confidence={liveness_confidence:.2f}"
+                )
+            except Exception as e:
+                print(f"[AntiSpoof] Failed: {e}")
+                is_live = False
+                liveness_confidence = 0.0
+
+            last_is_live = is_live
+            last_liveness_confidence = liveness_confidence
+        else:
+            is_live = last_is_live
+            liveness_confidence = last_liveness_confidence
+
     # ----------------------------------------
     # Automatic Verification (Background Thread)
     # ----------------------------------------
     if time.time() - last_verification_time >= VERIFICATION_INTERVAL:
         last_verification_time = time.time()
 
-        if face_crop is not None:
-
+        if face_crop is not None and last_is_live:
             # Only start a new verification if one isn't already running
             with recognition_lock:
                 should_start = not recognition_running
 
                 if should_start:
+                    status_message = ""
                     recognition_running = True
 
             if should_start:
@@ -189,7 +229,8 @@ while True:
             with recognition_lock:
                 recognition_status = None
                 recognition_distance = None
-                status_message = "NO FACE"
+                recognition_time = 0
+                status_message = ""
 
     # ----------------------------------------
     # Draw Recognition Result
@@ -199,35 +240,49 @@ while True:
         current_time = recognition_time
         current_message = status_message
 
-    if current_message != "":
+    with recognition_lock:
+        running = recognition_running
 
-        if current_message == "UNKNOWN":
-            color = (0, 0, 255)
+    if face_crop is None:
+        status_text = "NO FACE"
+        status_color = (0, 255, 255)
+    elif not last_is_live:
+        status_text = "SPOOF DETECTED"
+        status_color = (0, 0, 255)
+    elif running:
+        status_text = "PROCESSING..."
+        status_color = (255, 255, 255)
+    elif current_message == "ERROR":
+        status_text = "ERROR"
+        status_color = (0, 165, 255)
+    elif current_message == "UNKNOWN":
+        status_text = "UNKNOWN"
+        status_color = (0, 0, 255)
+    else:
+        status_text = current_message
+        status_color = (0, 255, 0)
 
-        elif current_message == "NO FACE":
-            color = (0, 255, 255)
+    cv2.putText(
+        frame,
+        status_text,
+        (20, 40),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        status_color,
+        2,
+    )
 
-        elif current_message == "ERROR":
-            color = (0, 165, 255)
-
-        else:
-            color = (0, 255, 0)
+    if current_distance is not None:
 
         cv2.putText(
-            frame, current_message, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2
+            frame,
+            f"Distance: {current_distance:.3f}",
+            (20, 80),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (255, 255, 255),
+            2,
         )
-
-        if current_distance is not None:
-
-            cv2.putText(
-                frame,
-                f"Distance: {current_distance:.3f}",
-                (20, 80),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (255, 255, 255),
-                2,
-            )
 
     # ----------------------------------------
     # Display Window
@@ -289,6 +344,16 @@ while True:
         cv2.FONT_HERSHEY_SIMPLEX,
         0.7,
         (255, 255, 0),
+        2,
+    )
+
+    cv2.putText(
+        frame,
+        f"Liveness: {last_liveness_confidence:.2f}",
+        (20, 240),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
         2,
     )
     cv2.imshow("Face Verification", frame)
